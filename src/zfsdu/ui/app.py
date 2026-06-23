@@ -120,6 +120,11 @@ class ZFSDUApp(App[None]):
             self._set_status("Snapshots cannot be opened")
             return
 
+        if self.index and not self.index.has_children(entry.name):
+            #TODO What if it has children, but snapshots are hidden?
+            self._set_status("Already at top level")
+            return
+
         self._current_directory = entry.name
         self._render_browser()
         count = len(self._visible_names)
