@@ -6,8 +6,20 @@ Screen {
     height: 1fr;
 }
 
-#tree {
+#browser {
     width: 1fr;
+}
+
+#path {
+    border: round $accent;
+    padding: 0 1;
+    margin-bottom: 1;
+    height: 3;
+}
+
+#entries {
+    width: 1fr;
+    height: 1fr;
     border: round $accent;
 }
 

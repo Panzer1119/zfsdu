@@ -53,15 +53,17 @@ class DatasetIndex:
         if not needle:
             return []
 
-        root_prefix = f"{root}/" if root else None
         matches: list[str] = []
         for name in self.entries:
-            if root and not (
-                name == root
-                or name.startswith(root_prefix)
-                or name.startswith(f"{root}@")
-            ):
-                continue
+            if root:
+                root_prefix = f"{root}/"
+                root_snapshot_prefix = f"{root}@"
+                if not (
+                    name == root
+                    or name.startswith(root_prefix)
+                    or name.startswith(root_snapshot_prefix)
+                ):
+                    continue
             if needle in name.lower():
                 matches.append(name)
         matches.sort()

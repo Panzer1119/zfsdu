@@ -6,7 +6,8 @@ It uses `zfs list` metadata directly (no filesystem walking), so it stays fast o
 ## Features
 
 - Interactive Textual TUI with keyboard-first workflow
-- Dataset tree browsing with usage metrics (`used`, `refer`, snapshot usage)
+- `ncdu`-style browser: move up/down in a list and enter/leave datasets with `→` / `←`
+- Dataset browsing with usage metrics (`used`, `refer`, snapshot usage)
 - Sorting by `used`, `refer`, snapshot usage, or name
 - Fast case-insensitive dataset search
 - Snapshot visibility toggle
@@ -56,6 +57,8 @@ uv run zfsdu --color never
 
 - `q` quit
 - `r` refresh ZFS data
+- `←` leave the current dataset
+- `→` or `Enter` open the selected dataset
 - `s` cycle sort metric
 - `m` cycle size display mode
 - `t` toggle snapshot visibility

@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
-from textual.widgets import Footer, Header, Input, Static, Tree
+from textual.containers import Horizontal, Vertical
+from textual.message import Message
+from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from zfsdu.errors import ZFSDUError
 from zfsdu.formatters import format_bytes, format_percent
@@ -24,12 +25,46 @@ class UIConfig:
     sort_metric: SortMetric
 
 
+_BROWSER_BINDINGS = [
+    binding
+    for binding in Binding.make_bindings(DataTable.BINDINGS)
+    if binding.key not in {"enter", "left", "right"}
+]
+
+
+class DatasetTable(DataTable):
+    BINDINGS = [
+        Binding("right", "open_selected", "Open", show=False),
+        Binding("enter", "open_selected", "Open", show=False),
+        Binding("left", "leave_directory", "Up", show=False),
+        *_BROWSER_BINDINGS,
+    ]
+
+    class OpenSelected(Message):
+        def __init__(self, table: DatasetTable) -> None:
+            super().__init__()
+            self.table = table
+
+    class LeaveDirectory(Message):
+        def __init__(self, table: DatasetTable) -> None:
+            super().__init__()
+            self.table = table
+
+    def action_open_selected(self) -> None:
+        self.post_message(self.OpenSelected(self))
+
+    def action_leave_directory(self) -> None:
+        self.post_message(self.LeaveDirectory(self))
+
+
 class ZFSDUApp(App[None]):
     TITLE = "zfsdu"
     CSS_PATH = "zfsdu.tcss"
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
+        Binding("left", "leave_directory", "Up"),
+        Binding("right,enter", "enter_dataset", "Open"),
         Binding("s", "cycle_sort", "Sort"),
         Binding("m", "cycle_size", "Size"),
         Binding("t", "toggle_snapshots", "Snapshots"),
@@ -41,7 +76,9 @@ class ZFSDUApp(App[None]):
         self.zfs_client = zfs_client
         self.config = config
         self.index: DatasetIndex | None = None
-        self.name_to_node: dict[str, Tree.Node] = {}
+        self._current_directory = config.root
+        self._selected_name: str | None = None
+        self._visible_names: list[str] = []
         self._search_results: list[str] = []
         self._search_cursor = 0
         self._last_search_query = ""
@@ -49,39 +86,83 @@ class ZFSDUApp(App[None]):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal(id="body"):
-            yield Tree("datasets", id="tree")
+            with Vertical(id="browser"):
+                yield Static(id="path")
+                yield DatasetTable(id="entries")
             yield Static("Loading...", id="details")
         yield Input(placeholder="Search datasets...", id="search-box", classes="hidden")
         yield Static(
-            "Press / to search, s to sort, m to change size mode, t to toggle snapshots",
+            "Use ←/→ to leave or enter datasets, / to search, s to sort, "
+            "m to change size mode, t to toggle snapshots",
             id="status",
         )
         yield Footer()
 
     def on_mount(self) -> None:
+        table = self.query_one("#entries", DatasetTable)
+        table.cursor_type = "row"
+        table.zebra_stripes = True
+        table.add_columns("Name", "Used", "Refer", "Snapshots", "Share", "Type")
         self._load_data()
+        table.focus()
 
     def action_refresh(self) -> None:
         self._load_data()
+
+    def action_enter_dataset(self) -> None:
+        if not self.index:
+            return
+        if not self._selected_name:
+            self._set_status("No dataset selected")
+            return
+
+        entry = self.index.entries[self._selected_name]
+        if entry.dataset_type is DatasetType.SNAPSHOT:
+            self._set_status("Snapshots cannot be opened")
+            return
+
+        self._current_directory = entry.name
+        self._render_browser()
+        count = len(self._visible_names)
+        if count:
+            self._set_status(f"Opened {entry.name} ({count} entries)")
+        else:
+            self._set_status(f"Opened {entry.name} (empty)")
+
+    def action_leave_directory(self) -> None:
+        if not self.index:
+            return
+        if self._current_directory is None:
+            self._set_status("Already at top level")
+            return
+        if self.config.root and self._current_directory == self.config.root:
+            self._set_status("Already at scan root")
+            return
+
+        previous = self._current_directory
+        self._current_directory = self.index.entries[previous].parent_name
+        self._render_browser(select_name=previous)
+        location = self._current_directory or "top level"
+        self._set_status(f"Browsing {location}")
 
     def action_cycle_sort(self) -> None:
         order = [SortMetric.USED, SortMetric.REFER, SortMetric.SNAPSHOT, SortMetric.NAME]
         idx = (order.index(self.config.sort_metric) + 1) % len(order)
         self.config.sort_metric = order[idx]
-        self._render_tree()
+        self._render_browser(select_name=self._selected_name)
         self._set_status(f"Sort: {self.config.sort_metric.value}")
 
     def action_cycle_size(self) -> None:
         order = [SizeMode.IEC, SizeMode.DECIMAL, SizeMode.RAW]
         idx = (order.index(self.config.size_mode) + 1) % len(order)
         self.config.size_mode = order[idx]
-        self._render_tree()
+        self._render_browser(select_name=self._selected_name)
         self._refresh_details()
         self._set_status(f"Size mode: {self.config.size_mode.value}")
 
     def action_toggle_snapshots(self) -> None:
         self.config.include_snapshots = not self.config.include_snapshots
-        self._render_tree()
+        self._render_browser(select_name=self._selected_name)
         state = "shown" if self.config.include_snapshots else "hidden"
         self._set_status(f"Snapshots {state}")
 
@@ -92,67 +173,133 @@ class ZFSDUApp(App[None]):
 
     def _load_data(self) -> None:
         self._set_status("Loading ZFS metadata...")
+        previous_directory = self._current_directory
+        previous_selection = self._selected_name
         try:
             entries = self.zfs_client.list_entries(self.config.dataset_types, self.config.root)
         except ZFSDUError as exc:
             self._set_status(f"Error: {exc}")
             return
         self.index = DatasetIndex.build(entries)
-        self._render_tree()
+        self._search_results.clear()
+        self._search_cursor = 0
+        self._last_search_query = ""
+        self._current_directory = self._restore_directory(previous_directory)
+        self._render_browser(select_name=previous_selection)
         self._set_status(f"Loaded {len(entries)} ZFS entries")
 
-    def _render_tree(self) -> None:
-        tree = self.query_one("#tree", Tree)
-        tree.clear()
-        tree.root.set_label("datasets")
-        tree.root.expand()
-        self.name_to_node.clear()
+    def _restore_directory(self, previous_directory: str | None) -> str | None:
+        if not self.index:
+            return self.config.root
+        if previous_directory and previous_directory in self.index.entries:
+            return previous_directory
+        if self.config.root and self.config.root in self.index.entries:
+            return self.config.root
+        return None
 
+    def _render_browser(self, *, select_name: str | None = None) -> None:
         if not self.index:
             return
 
-        for top_name in self.index.top_level(self.config.root):
-            self._add_subtree(tree.root, top_name)
+        table = self.query_one("#entries", DatasetTable)
+        table.clear(columns=False)
+        self._visible_names = self._visible_children(self._current_directory)
 
-        if self.name_to_node:
-            first = next(iter(self.name_to_node.values()))
-            tree.select_node(first)
-            self._refresh_details(first.data)
+        for name in self._visible_names:
+            entry = self.index.entries[name]
+            table.add_row(
+                self._row_name(entry),
+                format_bytes(entry.used, self.config.size_mode),
+                format_bytes(entry.refer, self.config.size_mode),
+                format_bytes(entry.used_by_snapshots, self.config.size_mode),
+                self._share_of_parent(entry),
+                entry.dataset_type.value,
+                key=name,
+            )
 
-    def _add_subtree(self, parent: Tree.Node, name: str) -> None:
+        self._update_path()
+
+        if self._visible_names:
+            if select_name is not None and select_name in self._visible_names:
+                row = self._visible_names.index(select_name)
+            else:
+                row = 0
+            self._selected_name = self._visible_names[row]
+            table.move_cursor(row=row, column=0)
+        else:
+            self._selected_name = None
+
+        self._refresh_details()
+
+    def _visible_children(self, parent_name: str | None) -> list[str]:
         if not self.index:
-            return
-        entry = self.index.entries[name]
-
-        children = self.index.children_of(
-            name,
+            return []
+        if parent_name is None:
+            return [
+                name for name in self.index.top_level(self.config.root) if self._is_visible(name)
+            ]
+        return self.index.children_of(
+            parent_name,
             include_snapshots=self.config.include_snapshots,
             allowed_types=self.config.dataset_types,
             sort_metric=self.config.sort_metric,
         )
-        node = parent.add(self._node_label(entry), data=name, allow_expand=bool(children))
-        self.name_to_node[name] = node
-        for child_name in children:
-            self._add_subtree(node, child_name)
 
-    def _node_label(self, entry: ZFSEntry) -> str:
-        return (
-            f"{entry.short_name}  [dim]used:[/] {format_bytes(entry.used, self.config.size_mode)}"
-            f"  [dim]refer:[/] {format_bytes(entry.refer, self.config.size_mode)}"
+    def _is_visible(self, name: str) -> bool:
+        if not self.index:
+            return False
+        entry = self.index.entries[name]
+        if entry.dataset_type not in self.config.dataset_types:
+            return False
+        if entry.dataset_type is DatasetType.SNAPSHOT and not self.config.include_snapshots:
+            return False
+        return True
+
+    def _row_name(self, entry: ZFSEntry) -> str:
+        prefix = "▸ " if entry.dataset_type is not DatasetType.SNAPSHOT else "  "
+        return f"{prefix}{entry.short_name}"
+
+    def _share_of_parent(self, entry: ZFSEntry) -> str:
+        if not self.index:
+            return "-"
+        parent_name = entry.parent_name
+        if not parent_name:
+            return "-"
+        parent = self.index.entries.get(parent_name)
+        if not parent or parent.used <= 0:
+            return "-"
+        return format_percent(entry.used, parent.used)
+
+    def _update_path(self) -> None:
+        root_label = self.config.root or "all datasets"
+        current_label = self._current_directory or "top level"
+        count = len(self._visible_names)
+        noun = "entry" if count == 1 else "entries"
+        self.query_one("#path", Static).update(
+            f"[b]Browsing:[/] {current_label}  [dim]root:[/] {root_label}\n"
+            f"[dim]items:[/] {count} {noun}"
         )
 
-    @on(Tree.NodeSelected)
-    def on_tree_selected(self, event: Tree.NodeSelected) -> None:
-        name = event.node.data
-        if isinstance(name, str):
-            self._refresh_details(name)
+    @on(DatasetTable.OpenSelected)
+    def on_open_selected(self) -> None:
+        self.action_enter_dataset()
+
+    @on(DatasetTable.LeaveDirectory)
+    def on_leave_directory(self) -> None:
+        self.action_leave_directory()
+
+    @on(DataTable.RowHighlighted, "#entries")
+    def on_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if 0 <= event.cursor_row < len(self._visible_names):
+            self._selected_name = self._visible_names[event.cursor_row]
+            self._refresh_details()
 
     @on(Input.Submitted, "#search-box")
     def on_search_submitted(self, event: Input.Submitted) -> None:
         query = event.value.strip()
         event.input.add_class("hidden")
         event.input.value = ""
-        self.query_one("#tree", Tree).focus()
+        self.query_one("#entries", DatasetTable).focus()
 
         if not query:
             self._set_status("Search canceled")
@@ -179,32 +326,37 @@ class ZFSDUApp(App[None]):
         name = self._search_results[self._search_cursor]
         self._search_cursor += 1
 
-        node = self.name_to_node.get(name)
-        if not node:
+        if not self._is_visible(name):
             self._set_status("Match is currently filtered out")
             return
 
-        self._expand_ancestors(node)
-        tree = self.query_one("#tree", Tree)
-        tree.select_node(node)
-        self._refresh_details(name)
+        self._current_directory, select_name = self._search_location(name)
+        self._render_browser(select_name=select_name)
         self._set_status(f"Match {self._search_cursor}/{len(self._search_results)}: {name}")
 
-    def _expand_ancestors(self, node: Tree.Node) -> None:
-        parent = node.parent
-        while parent is not None:
-            parent.expand()
-            parent = parent.parent
+    def _search_location(self, name: str) -> tuple[str | None, str | None]:
+        if not self.index:
+            return (self.config.root, None)
+        if self.config.root and name == self.config.root:
+            return (self.config.root, None)
+        return (self.index.entries[name].parent_name, name)
 
     def _refresh_details(self, name: str | None = None) -> None:
         details = self.query_one("#details", Static)
-        if not self.index or not name:
+        if not self.index:
             details.update("No dataset selected")
             return
 
-        entry = self.index.entries[name]
+        target_name = name or self._selected_name or self._current_directory
+        if not target_name:
+            details.update("No dataset selected")
+            return
+
+        entry = self.index.entries[target_name]
         parent = self.index.entries.get(entry.parent_name or "")
         parent_used = parent.used if parent else 0
+        visible_children = len(self._visible_children(entry.name))
+        total_children = len(self.index.children.get(entry.name, []))
 
         rows = [
             f"[b]{entry.name}[/b]",
@@ -217,6 +369,8 @@ class ZFSDUApp(App[None]):
             f"used by children:  {format_bytes(entry.used_by_children, self.config.size_mode)}",
             "refreservation:    "
             f"{format_bytes(entry.used_by_refreservation, self.config.size_mode)}",
+            f"children shown:    {visible_children}",
+            f"children total:    {total_children}",
             f"mountpoint:        {entry.mountpoint}",
         ]
         if parent:
