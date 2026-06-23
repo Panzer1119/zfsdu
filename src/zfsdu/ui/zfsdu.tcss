@@ -1,0 +1,37 @@
+Screen {
+    layout: vertical;
+}
+
+#body {
+    height: 1fr;
+}
+
+#tree {
+    width: 1fr;
+    border: round $accent;
+}
+
+#details {
+    width: 1fr;
+    border: round $primary;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+#search-box {
+    dock: bottom;
+    height: auto;
+    margin: 0 1 1 1;
+}
+
+#search-box.hidden {
+    display: none;
+}
+
+#status {
+    dock: bottom;
+    height: 1;
+    content-align: center middle;
+    color: $text-muted;
+}
+

@@ -1,5 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
 [project]
 name = "zfsdu"
 version = "0.1.0"
-requires-python = ">=3.13"
-dependencies = []
+description = "An ncdu-inspired TUI browser for ZFS datasets, volumes, and snapshots"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "zfsdu contributors" }
+]
+dependencies = [
+  "textual>=0.70.0",
+]
+
+[project.scripts]
+zfsdu = "zfsdu.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.5",
+  "mypy>=1.11",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zfsdu"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/zfsdu/ui/zfsdu.tcss" = "zfsdu/ui/zfsdu.tcss"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
