@@ -255,8 +255,12 @@ class ZFSDUApp(App[None]):
         return True
 
     def _row_name(self, entry: ZFSEntry) -> str:
-        prefix = "▸ " if not entry.is_snapshot else "  "
-        return f"{prefix}{entry.short_name}"
+        if entry.is_snapshot:
+            return f"@ {entry.short_name}"
+        if self.index and not self.index.has_children(entry.name):
+            #TODO What if it has children, but snapshots are hidden?
+            return f"  {entry.short_name}"
+        return f"▸ {entry.short_name}"
 
     def _share_of_parent(self, entry: ZFSEntry) -> str:
         if not self.index:
