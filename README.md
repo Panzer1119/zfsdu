@@ -83,3 +83,47 @@ uv run pytest
 - Avoids filesystem scans and `du` entirely.
 - Supports large trees with filtering and search over metadata.
 
+## System Testing with Vagrant
+
+Vagrant provides a full virtual machine environment for:
+- System-level testing
+- Running code with kernel dependencies
+- Simulating production-like environments
+
+Workflow:
+```bash
+# Start the Vagrant VM
+vagrant up
+
+# Connect to the VM
+vagrant ssh
+
+# Inside the VM, navigate to the project
+cd ~/zfsdu
+
+# Run uv sync to install dependencies
+uv sync
+uv sync --extra dev
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Run tests
+uv run pytest
+```
+
+### Keeping Files in Sync
+
+Use these methods to keep your local files synchronized with the Vagrant VM:
+
+### Manual Sync
+```bash
+# Sync files from local to Vagrant VM
+vagrant rsync
+```
+
+###### Continuous Sync
+```bash
+# Automatically sync files as they change
+vagrant rsync-auto
+```
