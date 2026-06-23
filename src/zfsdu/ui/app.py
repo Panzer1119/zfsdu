@@ -116,7 +116,7 @@ class ZFSDUApp(App[None]):
             return
 
         entry = self.index.entries[self._selected_name]
-        if entry.dataset_type is DatasetType.SNAPSHOT:
+        if entry.is_snapshot:
             self._set_status("Snapshots cannot be opened")
             return
 
@@ -250,12 +250,12 @@ class ZFSDUApp(App[None]):
         entry = self.index.entries[name]
         if entry.dataset_type not in self.config.dataset_types:
             return False
-        if entry.dataset_type is DatasetType.SNAPSHOT and not self.config.include_snapshots:
+        if entry.is_snapshot and not self.config.include_snapshots:
             return False
         return True
 
     def _row_name(self, entry: ZFSEntry) -> str:
-        prefix = "▸ " if entry.dataset_type is not DatasetType.SNAPSHOT else "  "
+        prefix = "▸ " if not entry.is_snapshot else "  "
         return f"{prefix}{entry.short_name}"
 
     def _share_of_parent(self, entry: ZFSEntry) -> str:
