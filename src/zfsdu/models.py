@@ -12,11 +12,13 @@ class DatasetType(StrEnum):
 
 
 class SortMetric(StrEnum):
+    NAME = "name"
     USED_BYTES = "used_bytes"
     REFERENCED_BYTES = "referenced_bytes"
     SNAPSHOT_USED_BYTES = "snapshot_used_bytes"
     SNAPSHOT_COUNT = "snapshot_count"
-    NAME = "name"
+    SHARE = "share"
+    TYPE = "type"
 
 
 class SortDirection(StrEnum):
@@ -51,6 +53,23 @@ class ZFSEntry:
     @property
     def is_bookmark(self) -> bool:
         return self.dataset_type is DatasetType.BOOKMARK
+
+    @property
+    def is_normal(self) -> bool:
+        return self.dataset_type in {DatasetType.FILESYSTEM, DatasetType.VOLUME}
+
+    @property
+    def order(self) -> int:
+        """Return an integer representing the order of the dataset type for sorting purposes."""
+        if self.dataset_type is DatasetType.FILESYSTEM:
+            return 0
+        if self.dataset_type is DatasetType.VOLUME:
+            return 1
+        if self.dataset_type is DatasetType.SNAPSHOT:
+            return 2
+        if self.dataset_type is DatasetType.BOOKMARK:
+            return 3
+        return 4
 
     @property
     def parent_name(self) -> str | None:

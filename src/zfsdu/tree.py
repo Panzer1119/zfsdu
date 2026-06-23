@@ -37,7 +37,7 @@ class DatasetIndex:
         include_bookmarks: bool,
         allowed_types: set[DatasetType],
         sort_metric: SortMetric,
-        sort_direction: SortDirection = SortDirection.DESC,
+        sort_direction: SortDirection = SortDirection.ASC,
     ) -> list[str]:
         names = []
         for child_name in self.children.get(parent_name, []):
@@ -51,7 +51,20 @@ class DatasetIndex:
             names.append(child_name)
 
         reverse = sort_direction is SortDirection.DESC
-        return sorted(names, key=lambda name: self._sort_key(self.entries[name], sort_metric), reverse=reverse)
+
+        # Pre-sort by names
+        names_sorted = sorted(names, key=lambda name: self.entries[name].short_name.lower())
+
+        # Sort by the specified metric and direction
+        names_sorted = sorted(
+            names_sorted, key=lambda name: self._sort_key(self.entries[name], sort_metric), reverse=reverse
+        )
+
+        if sort_metric is SortMetric.TYPE:
+            return names_sorted
+
+        # And if not already done, sort by dataset type order
+        return sorted(names_sorted, key=lambda name: self.entries[name].order)
 
     def has_children(self, name: str) -> bool:
         return name in self.children
@@ -80,13 +93,21 @@ class DatasetIndex:
     @staticmethod
     def _sort_key(entry: ZFSEntry, metric: SortMetric) -> tuple:
         if metric is SortMetric.NAME:
-            return (entry.short_name.lower(),)
+            return (entry.short_name.lower(), )
+        if metric is SortMetric.USED_BYTES:
+            return (entry.used, )
         if metric is SortMetric.REFERENCED_BYTES:
-            return (entry.refer, entry.short_name.lower())
+            return (entry.refer, )
         if metric is SortMetric.SNAPSHOT_USED_BYTES:
-            return (entry.used_by_snapshots, entry.short_name.lower())
+            return (entry.used_by_snapshots, )
         if metric is SortMetric.SNAPSHOT_COUNT:
-            return (entry.snapshot_count, entry.short_name.lower())
-        return (entry.used, entry.short_name.lower())
+            return (entry.snapshot_count, )
+        #TODO How to sort by share?
+        # if metric is SortMetric.SHARE:
+        #     return (entry.share, )
+        if metric is SortMetric.TYPE:
+            # return (entry.dataset_type, )
+            return (entry.order, )
+        return (entry.short_name.lower(),)
 
 
