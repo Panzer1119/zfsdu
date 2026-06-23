@@ -17,6 +17,7 @@ from zfsdu.models import (
     SortDirection,
     SortMetric,
     ZFSEntry,
+    Column,
 )
 from zfsdu.tree import DatasetIndex
 from zfsdu.zfs import ZFSClient
@@ -37,6 +38,63 @@ _BROWSER_BINDINGS = [
     binding
     for binding in Binding.make_bindings(DataTable.BINDINGS)
     if binding.key not in {"enter", "left", "right"}
+]
+
+_COLUMNS: list[Column] = [
+    Column(
+        key="name",
+        label_full="Name",
+        sort_metric=SortMetric.NAME,
+        sort_direction=None,
+    ),
+    Column(
+        key="used_bytes",
+        label_full="Used Bytes",
+        label_short="Used",
+        sort_metric=SortMetric.USED_BYTES,
+        default_sort_direction=SortDirection.DESC,
+        sort_direction=None,
+    ),
+    Column(
+        key="referenced_bytes",
+        label_full="Referenced Bytes",
+        label_short="Refer",
+        sort_metric=SortMetric.REFERENCED_BYTES,
+        default_sort_direction=SortDirection.DESC,
+        sort_direction=None,
+    ),
+    Column(
+        key="snapshot_used_bytes",
+        label_full="Snapshot Used Bytes",
+        label_short="Snapshot Used",
+        sort_metric=SortMetric.SNAPSHOT_USED_BYTES,
+        default_sort_direction=SortDirection.DESC,
+        sort_direction=None,
+    ),
+    Column(
+        key="snapshot_count",
+        label_full="Snapshot Count",
+        label_short="Snapshots",
+        sort_metric=SortMetric.SNAPSHOT_COUNT,
+        default_sort_direction=SortDirection.DESC,
+        sort_direction=None,
+    ),
+    Column(
+        key="share",
+        label_full="Share of Parent",
+        label_short="Share",
+        # sort_metric=SortMetric.SHARE,
+        sort_metric=None, #TODO How to sort by share?
+        default_sort_direction=SortDirection.DESC,
+        sort_direction=None,
+    ),
+    Column(
+        key="type",
+        label_full="Dataset Type",
+        label_short="Type",
+        sort_metric=SortMetric.TYPE,
+        sort_direction=None,
+    )
 ]
 
 
@@ -72,8 +130,9 @@ class ZFSDUApp(App[None]):
         Binding("r", "refresh", "Refresh"),
         Binding("left", "leave_dataset", "Up"),
         Binding("right,enter", "enter_dataset", "Open"),
-        Binding("s", "cycle_sort", "Sort"),
-        Binding("shift+s", "toggle_sort_direction", "Reverse"),
+        Binding("s", "cycle_sort_next", "Sort"),
+        Binding("shift+s", "cycle_sort_previous", "Sort (prev)"),
+        Binding("i", "toggle_sort_direction", "Reverse"),
         Binding("m", "cycle_size", "Size"),
         Binding("t", "toggle_snapshots", "Snapshots"),
         Binding("b", "toggle_bookmarks", "Bookmarks"),
@@ -111,34 +170,23 @@ class ZFSDUApp(App[None]):
         table = self.query_one("#entries", DatasetTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("Name", "Used", "Refer", "Snapshots Used", "Snapshots", "Share", "Type")
+        columns: list[tuple[str, str]] = [(column.get_label, column.key) for column in _COLUMNS]
+        table.add_columns(*columns)
         self._load_data()
         table.focus()
 
-    def _update_sort_indicator(self) -> None:
+    def _update_columns(self) -> None:
         """Update column headers to show which column is sorted and in what direction."""
         table = self.query_one("#entries", DatasetTable)
-        direction_symbol = "↓" if self.config.sort_direction is SortDirection.DESC else "↑"
-
-        # Map sort metrics to column indices
-        metric_to_column = {
-            SortMetric.NAME: 0,
-            SortMetric.USED_BYTES: 1,
-            SortMetric.REFERENCED_BYTES: 2,
-            SortMetric.SNAPSHOT_USED_BYTES: 3,
-            SortMetric.SNAPSHOT_COUNT: 4,
-        }
-
-        # Update column labels
-        columns = ["Name", "Used", "Refer", "Snapshots Used", "Snapshots", "Share", "Type"]
-
-        if self.config.sort_metric in metric_to_column:
-            col_idx = metric_to_column[self.config.sort_metric]
-            columns[col_idx] = f"{columns[col_idx]} {direction_symbol}"
-
-        # Clear and re-add columns with updated headers
-        table.clear(columns=True)
-        table.add_columns(*columns)
+        for column in _COLUMNS:
+            if column.sort_metric == self.config.sort_metric:
+                column.sort_direction = self.config.sort_direction
+            else:
+                column.sort_direction = None
+            table_column = table.columns.get(column.key)
+            if not table_column:
+                continue
+            table_column.label = column.get_label
 
     def action_refresh(self) -> None:
         self._load_data()
@@ -189,28 +237,34 @@ class ZFSDUApp(App[None]):
         location = self._current_directory or "top level"
         self._set_status(f"Browsing {location}")
 
-    def action_cycle_sort(self) -> None:
-        order = [
-            SortMetric.USED_BYTES,
-            SortMetric.REFERENCED_BYTES,
-            SortMetric.SNAPSHOT_USED_BYTES,
-            SortMetric.SNAPSHOT_COUNT,
-            SortMetric.NAME,
-        ]
-        idx = (order.index(self.config.sort_metric) + 1) % len(order)
+    def action_cycle_sort_next(self) -> None:
+        self.cycle_sort(cycle_next=True)
+
+    def action_cycle_sort_previous(self) -> None:
+        self.cycle_sort(cycle_next=False)
+
+    def cycle_sort(self, cycle_next: bool = True) -> None:
+        order: list[SortMetric] = []
+        for column in _COLUMNS:
+            if column.is_sortable and column.sort_metric is not None:
+                order.append(column.sort_metric)
+        if cycle_next:
+            idx = (order.index(self.config.sort_metric) + 1) % len(order)
+        else:
+            idx = (order.index(self.config.sort_metric) - 1) % len(order)
         self.config.sort_metric = order[idx]
-        self.config.sort_direction = SortDirection.DESC  # Reset to DESC when changing metric
+        self.config.sort_direction = SortDirection.ASC  # Reset to ASC when changing metric
+        for column in _COLUMNS:
+            if column.sort_metric == self.config.sort_metric and column.default_sort_direction is not None:
+                self.config.sort_direction = column.default_sort_direction
         self._render_browser(select_name=self._selected_name)
-        self._update_sort_indicator()
-        self._set_status(f"Sort: {self.config.sort_metric.value} (↓)")
+        direction_label = "↓" if self.config.sort_direction is SortDirection.DESC else "↑"
+        self._set_status(f"Sort: {self.config.sort_metric.value} ({direction_label})")
 
     def action_toggle_sort_direction(self) -> None:
         is_desc = self.config.sort_direction is SortDirection.DESC
-        self.config.sort_direction = (
-            SortDirection.ASC if is_desc else SortDirection.DESC
-        )
+        self.config.sort_direction = SortDirection.ASC if is_desc else SortDirection.DESC
         self._render_browser(select_name=self._selected_name)
-        self._update_sort_indicator()
         direction_label = "↓" if self.config.sort_direction is SortDirection.DESC else "↑"
         self._set_status(f"Sort direction: {self.config.sort_direction.value} {direction_label}")
 
@@ -287,7 +341,7 @@ class ZFSDUApp(App[None]):
             )
 
         self._update_path()
-        self._update_sort_indicator()
+        self._update_columns()
 
         if self._visible_names:
             if select_name is not None and select_name in self._visible_names:
@@ -304,26 +358,30 @@ class ZFSDUApp(App[None]):
     def _snapshot_count(self, parent_name: str | None) -> int:
         if not self.index or parent_name is None:
             return 0
-        return len(self.index.children_of(
-            parent_name,
-            include_snapshots=True,
-            include_bookmarks=False,
-            allowed_types={DatasetType.SNAPSHOT},
-            sort_metric=self.config.sort_metric,
-            sort_direction=self.config.sort_direction,
-        ))
+        return len(
+            self.index.children_of(
+                parent_name,
+                include_snapshots=True,
+                include_bookmarks=False,
+                allowed_types={DatasetType.SNAPSHOT},
+                sort_metric=self.config.sort_metric,
+                sort_direction=self.config.sort_direction,
+            )
+        )
 
     def _bookmark_count(self, parent_name: str | None) -> int:
         if not self.index or parent_name is None:
             return 0
-        return len(self.index.children_of(
-            parent_name,
-            include_snapshots=False,
-            include_bookmarks=True,
-            allowed_types={DatasetType.BOOKMARK},
-            sort_metric=self.config.sort_metric,
-            sort_direction=self.config.sort_direction,
-        ))
+        return len(
+            self.index.children_of(
+                parent_name,
+                include_snapshots=False,
+                include_bookmarks=True,
+                allowed_types={DatasetType.BOOKMARK},
+                sort_metric=self.config.sort_metric,
+                sort_direction=self.config.sort_direction,
+            )
+        )
 
     def _visible_children(self, parent_name: str | None) -> list[str]:
         if not self.index:

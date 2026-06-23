@@ -32,6 +32,35 @@ class SizeMode(StrEnum):
     RAW = "raw"
 
 
+@dataclass(slots=True, frozen=False)
+class Column:
+    """Uniquely identifies a column in the DataTable."""
+    key: str
+    label_full: str
+    label_short: str | None = None
+    sort_metric: SortMetric | None = None
+    default_sort_direction: SortDirection = SortDirection.ASC
+    sort_direction: SortDirection | None = None
+    hidden: bool = False
+
+    @property
+    def is_sortable(self) -> bool:
+        return self.sort_metric is not None
+
+    @property
+    def is_sorted_by(self) -> bool:
+        return self.is_sortable and self.sort_direction is not None
+
+    @property
+    def get_label(self, short: bool = True) -> str:
+        label: str = self.label_short if short and self.label_short is not None else self.label_full
+        if self.is_sorted_by:
+            direction_symbol = "▲" if self.sort_direction is SortDirection.ASC else "▼"
+            return f"{label} {direction_symbol}"
+        #return label
+        return f"{label}  "
+
+
 @dataclass(slots=True, frozen=True)
 class ZFSEntry:
     name: str
