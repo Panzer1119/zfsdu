@@ -67,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
 def parse_types(raw: str) -> set[DatasetType]:
     raw = raw.strip().lower()
     if raw == "all":
-        return {DatasetType.FILESYSTEM, DatasetType.VOLUME, DatasetType.SNAPSHOT}
+        return {DatasetType.FILESYSTEM, DatasetType.VOLUME, DatasetType.SNAPSHOT, DatasetType.BOOKMARK}
 
     items = {item.strip() for item in raw.split(",") if item.strip()}
     if not items:

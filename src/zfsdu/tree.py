@@ -18,7 +18,7 @@ class DatasetIndex:
 
         for entry in entries:
             parent = entry.parent_name
-            if parent and parent not in by_name and entry.dataset_type is not DatasetType.SNAPSHOT:
+            if parent and parent not in by_name and not entry.is_snapshot and not entry.is_bookmark:
                 parent = None
             children[parent].append(entry.name)
 

@@ -18,6 +18,7 @@ def test_build_and_children_sort_by_used() -> None:
     children = index.children_of(
         "tank",
         include_snapshots=False,
+        include_bookmarks=False,
         allowed_types={DatasetType.FILESYSTEM},
         sort_metric=SortMetric.USED,
     )
