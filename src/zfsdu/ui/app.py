@@ -300,6 +300,30 @@ class ZFSDUApp(App[None]):
 
         self._refresh_details()
 
+    def _snapshot_count(self, parent_name: str | None) -> int:
+        if not self.index or parent_name is None:
+            return 0
+        return len(self.index.children_of(
+            parent_name,
+            include_snapshots=True,
+            include_bookmarks=False,
+            allowed_types={DatasetType.SNAPSHOT},
+            sort_metric=self.config.sort_metric,
+            sort_direction=self.config.sort_direction,
+        ))
+
+    def _bookmark_count(self, parent_name: str | None) -> int:
+        if not self.index or parent_name is None:
+            return 0
+        return len(self.index.children_of(
+            parent_name,
+            include_snapshots=False,
+            include_bookmarks=True,
+            allowed_types={DatasetType.BOOKMARK},
+            sort_metric=self.config.sort_metric,
+            sort_direction=self.config.sort_direction,
+        ))
+
     def _visible_children(self, parent_name: str | None) -> list[str]:
         if not self.index:
             return []
@@ -436,6 +460,14 @@ class ZFSDUApp(App[None]):
         entry = self.index.entries[target_name]
         parent = self.index.entries.get(entry.parent_name or "")
         parent_used = parent.used if parent else 0
+        snapshot_count = self._snapshot_count(entry.name)
+        bookmark_count = self._bookmark_count(entry.name)
+        if entry.is_bookmark:
+            extra = ""
+        elif entry.is_snapshot:
+            extra = f"bookmarks:         {bookmark_count}"
+        else:
+            extra = f"snapshots:         {snapshot_count}"
         visible_children = len(self._visible_children(entry.name))
         total_children = len(self.index.children.get(entry.name, []))
 
@@ -450,6 +482,7 @@ class ZFSDUApp(App[None]):
             f"used by children:  {format_bytes(entry.used_by_children, self.config.size_mode)}",
             "refreservation:    "
             f"{format_bytes(entry.used_by_refreservation, self.config.size_mode)}",
+            extra,
             f"children shown:    {visible_children}",
             f"children total:    {total_children}",
             f"mountpoint:        {entry.mountpoint}",
