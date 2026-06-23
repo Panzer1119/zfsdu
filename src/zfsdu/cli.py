@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sort",
         choices=[metric.value for metric in SortMetric],
-        default=SortMetric.USED.value,
+        default=SortMetric.USED_BYTES.value,
         help="sort metric for tree nodes",
     )
 

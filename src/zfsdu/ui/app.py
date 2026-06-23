@@ -157,7 +157,7 @@ class ZFSDUApp(App[None]):
         self._set_status(f"Browsing {location}")
 
     def action_cycle_sort(self) -> None:
-        order = [SortMetric.USED, SortMetric.REFER, SortMetric.SNAPSHOT, SortMetric.NAME]
+        order = [SortMetric.USED_BYTES, SortMetric.REFERENCED_BYTES, SortMetric.SNAPSHOT_USED_BYTES, SortMetric.NAME]
         idx = (order.index(self.config.sort_metric) + 1) % len(order)
         self.config.sort_metric = order[idx]
         self._render_browser(select_name=self._selected_name)

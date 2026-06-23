@@ -12,9 +12,9 @@ class DatasetType(StrEnum):
 
 
 class SortMetric(StrEnum):
-    USED = "used"
-    REFER = "refer"
-    SNAPSHOT = "snapshot"
+    USED_BYTES = "used_bytes"
+    REFERENCED_BYTES = "referenced_bytes"
+    SNAPSHOT_USED_BYTES = "snapshot_used_bytes"
     NAME = "name"
 
 

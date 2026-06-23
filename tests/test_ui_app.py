@@ -39,7 +39,7 @@ def _make_app(*, root: str | None = None, include_snapshots: bool = False, inclu
             include_snapshots=include_snapshots,
             include_bookmarks=include_bookmarks,
             size_mode=SizeMode.RAW,
-            sort_metric=SortMetric.USED,
+            sort_metric=SortMetric.USED_BYTES,
         ),
     )
 
