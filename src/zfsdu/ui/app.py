@@ -34,27 +34,26 @@ _BROWSER_BINDINGS = [
 
 class DatasetTable(DataTable):
     BINDINGS = [
-        Binding("right", "open_selected", "Open", show=False),
-        Binding("enter", "open_selected", "Open", show=False),
-        Binding("left", "leave_directory", "Up", show=False),
+        Binding("right,enter", "enter_dataset", "Open", show=False),
+        Binding("left", "leave_dataset", "Up", show=False),
         *_BROWSER_BINDINGS,
     ]
 
-    class OpenSelected(Message):
+    class EnterDataset(Message):
         def __init__(self, table: DatasetTable) -> None:
             super().__init__()
             self.table = table
 
-    class LeaveDirectory(Message):
+    class LeaveDataset(Message):
         def __init__(self, table: DatasetTable) -> None:
             super().__init__()
             self.table = table
 
-    def action_open_selected(self) -> None:
-        self.post_message(self.OpenSelected(self))
+    def action_enter_dataset(self) -> None:
+        self.post_message(self.EnterDataset(self))
 
-    def action_leave_directory(self) -> None:
-        self.post_message(self.LeaveDirectory(self))
+    def action_leave_dataset(self) -> None:
+        self.post_message(self.LeaveDataset(self))
 
 
 class ZFSDUApp(App[None]):
@@ -63,7 +62,7 @@ class ZFSDUApp(App[None]):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
-        Binding("left", "leave_directory", "Up"),
+        Binding("left", "leave_dataset", "Up"),
         Binding("right,enter", "enter_dataset", "Open"),
         Binding("s", "cycle_sort", "Sort"),
         Binding("m", "cycle_size", "Size"),
@@ -129,7 +128,7 @@ class ZFSDUApp(App[None]):
         else:
             self._set_status(f"Opened {entry.name} (empty)")
 
-    def action_leave_directory(self) -> None:
+    def action_leave_dataset(self) -> None:
         if not self.index:
             return
         if self._current_directory is None:
@@ -280,13 +279,13 @@ class ZFSDUApp(App[None]):
             f"[dim]items:[/] {count} {noun}"
         )
 
-    @on(DatasetTable.OpenSelected)
-    def on_open_selected(self) -> None:
+    @on(DatasetTable.EnterDataset)
+    def on_enter_dataset(self) -> None:
         self.action_enter_dataset()
 
-    @on(DatasetTable.LeaveDirectory)
-    def on_leave_directory(self) -> None:
-        self.action_leave_directory()
+    @on(DatasetTable.LeaveDataset)
+    def on_leave_dataset(self) -> None:
+        self.action_leave_dataset()
 
     @on(DataTable.RowHighlighted, "#entries")
     def on_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
