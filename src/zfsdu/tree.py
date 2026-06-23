@@ -48,6 +48,9 @@ class DatasetIndex:
 
         return sorted(names, key=lambda name: self._sort_key(self.entries[name], sort_metric))
 
+    def has_children(self, name: str) -> bool:
+        return name in self.children
+
     def search(self, query: str, root: str | None) -> list[str]:
         needle = query.lower().strip()
         if not needle:
