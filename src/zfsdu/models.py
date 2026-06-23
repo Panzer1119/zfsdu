@@ -8,6 +8,7 @@ class DatasetType(StrEnum):
     FILESYSTEM = "filesystem"
     VOLUME = "volume"
     SNAPSHOT = "snapshot"
+    BOOKMARK = "bookmark"
 
 
 class SortMetric(StrEnum):
@@ -41,9 +42,15 @@ class ZFSEntry:
         return self.dataset_type is DatasetType.SNAPSHOT
 
     @property
+    def is_bookmark(self) -> bool:
+        return self.dataset_type is DatasetType.BOOKMARK
+
+    @property
     def parent_name(self) -> str | None:
         if self.is_snapshot:
             return self.name.split("@", 1)[0]
+        if self.is_bookmark:
+            return self.name.split("#", 1)[0]
         if "/" not in self.name:
             return None
         return self.name.rsplit("/", 1)[0]
@@ -52,6 +59,8 @@ class ZFSEntry:
     def short_name(self) -> str:
         if self.is_snapshot:
             return "@" + self.name.split("@", 1)[1]
+        if self.is_bookmark:
+            return "#" + self.name.split("#", 1)[1]
         if "/" not in self.name:
             return self.name
         return self.name.rsplit("/", 1)[1]
