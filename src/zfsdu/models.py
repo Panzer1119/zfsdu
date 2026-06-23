@@ -15,6 +15,7 @@ class SortMetric(StrEnum):
     USED_BYTES = "used_bytes"
     REFERENCED_BYTES = "referenced_bytes"
     SNAPSHOT_USED_BYTES = "snapshot_used_bytes"
+    SNAPSHOT_COUNT = "snapshot_count"
     NAME = "name"
 
 
@@ -36,6 +37,7 @@ class ZFSEntry:
     used_by_refreservation: int = 0
     creation: int = 0
     mountpoint: str = "-"
+    snapshot_count: int = 0 #TODO How do we calculate this, if this is read-only?
 
     @property
     def is_snapshot(self) -> bool:

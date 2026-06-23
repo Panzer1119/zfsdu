@@ -83,6 +83,8 @@ class DatasetIndex:
             return (-entry.refer, entry.short_name.lower())
         if metric is SortMetric.SNAPSHOT_USED_BYTES:
             return (-entry.used_by_snapshots, entry.short_name.lower())
+        if metric is SortMetric.SNAPSHOT_COUNT:
+            return (-entry.snapshot_count, entry.short_name.lower())
         return (-entry.used, entry.short_name.lower())
 
 
