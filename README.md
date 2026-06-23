@@ -8,7 +8,7 @@ It uses `zfs list` metadata directly (no filesystem walking), so it stays fast o
 - Interactive Textual TUI with keyboard-first workflow
 - `ncdu`-style browser: move up/down in a list and enter/leave datasets with `→` / `←`
 - Dataset browsing with usage metrics (`used`, `refer`, snapshot usage)
-- Sorting by `used`, `refer`, snapshot usage, or name
+- Sorting by `used`, `refer`, snapshot usage, or name with configurable direction
 - Fast case-insensitive dataset search
 - Snapshot visibility toggle
 - IEC, decimal, and raw-byte size display modes
@@ -48,6 +48,7 @@ uv run zfsdu --log-level INFO --log-file /tmp/zfsdu.log
 - `root` positional dataset root (optional)
 - `--types filesystem,volume,snapshot|all`
 - `--sort used|refer|snapshot|name`
+- `--sort-direction asc|desc` (default: desc)
 - `-H, --human` IEC units (default)
 - `-D, --human-decimal` decimal units
 - `-p, --parsable` raw bytes
@@ -63,6 +64,7 @@ uv run zfsdu --log-level INFO --log-file /tmp/zfsdu.log
 - `←` leave the current dataset
 - `→` or `Enter` open the selected dataset
 - `s` cycle sort metric
+- `Shift+s` toggle sort direction (ascending/descending)
 - `m` cycle size display mode
 - `t` toggle snapshot visibility
 - `/` search datasets (Enter to jump)

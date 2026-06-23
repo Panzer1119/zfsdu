@@ -19,6 +19,11 @@ class SortMetric(StrEnum):
     NAME = "name"
 
 
+class SortDirection(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
+
+
 class SizeMode(StrEnum):
     IEC = "iec"
     DECIMAL = "decimal"

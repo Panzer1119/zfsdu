@@ -11,7 +11,13 @@ from textual.widgets import DataTable, Footer, Header, Input, Static
 
 from zfsdu.errors import ZFSDUError
 from zfsdu.formatters import format_bytes, format_percent
-from zfsdu.models import DatasetType, SizeMode, SortMetric, ZFSEntry
+from zfsdu.models import (
+    DatasetType,
+    SizeMode,
+    SortDirection,
+    SortMetric,
+    ZFSEntry,
+)
 from zfsdu.tree import DatasetIndex
 from zfsdu.zfs import ZFSClient
 
@@ -24,6 +30,7 @@ class UIConfig:
     include_bookmarks: bool
     size_mode: SizeMode
     sort_metric: SortMetric
+    sort_direction: SortDirection
 
 
 _BROWSER_BINDINGS = [
@@ -66,6 +73,7 @@ class ZFSDUApp(App[None]):
         Binding("left", "leave_dataset", "Up"),
         Binding("right,enter", "enter_dataset", "Open"),
         Binding("s", "cycle_sort", "Sort"),
+        Binding("shift+s", "toggle_sort_direction", "Reverse"),
         Binding("m", "cycle_size", "Size"),
         Binding("t", "toggle_snapshots", "Snapshots"),
         Binding("b", "toggle_bookmarks", "Bookmarks"),
@@ -106,6 +114,31 @@ class ZFSDUApp(App[None]):
         table.add_columns("Name", "Used", "Refer", "Snapshots", "Share", "Type")
         self._load_data()
         table.focus()
+
+    def _update_sort_indicator(self) -> None:
+        """Update column headers to show which column is sorted and in what direction."""
+        table = self.query_one("#entries", DatasetTable)
+        direction_symbol = "↓" if self.config.sort_direction is SortDirection.DESC else "↑"
+
+        # Map sort metrics to column indices
+        metric_to_column = {
+            SortMetric.NAME: 0,
+            SortMetric.USED_BYTES: 1,
+            SortMetric.REFERENCED_BYTES: 2,
+            SortMetric.SNAPSHOT_USED_BYTES: 3,
+            SortMetric.SNAPSHOT_COUNT: 3,  # Also snapshots column
+        }
+
+        # Update column labels
+        columns = ["Name", "Used", "Refer", "Snapshots", "Share", "Type"]
+
+        if self.config.sort_metric in metric_to_column:
+            col_idx = metric_to_column[self.config.sort_metric]
+            columns[col_idx] = f"{columns[col_idx]} {direction_symbol}"
+
+        # Clear and re-add columns with updated headers
+        table.clear(columns=True)
+        table.add_columns(*columns)
 
     def action_refresh(self) -> None:
         self._load_data()
@@ -157,11 +190,29 @@ class ZFSDUApp(App[None]):
         self._set_status(f"Browsing {location}")
 
     def action_cycle_sort(self) -> None:
-        order = [SortMetric.USED_BYTES, SortMetric.REFERENCED_BYTES, SortMetric.SNAPSHOT_USED_BYTES, SortMetric.SNAPSHOT_COUNT, SortMetric.NAME]
+        order = [
+            SortMetric.USED_BYTES,
+            SortMetric.REFERENCED_BYTES,
+            SortMetric.SNAPSHOT_USED_BYTES,
+            SortMetric.SNAPSHOT_COUNT,
+            SortMetric.NAME,
+        ]
         idx = (order.index(self.config.sort_metric) + 1) % len(order)
         self.config.sort_metric = order[idx]
+        self.config.sort_direction = SortDirection.DESC  # Reset to DESC when changing metric
         self._render_browser(select_name=self._selected_name)
-        self._set_status(f"Sort: {self.config.sort_metric.value}")
+        self._update_sort_indicator()
+        self._set_status(f"Sort: {self.config.sort_metric.value} (↓)")
+
+    def action_toggle_sort_direction(self) -> None:
+        is_desc = self.config.sort_direction is SortDirection.DESC
+        self.config.sort_direction = (
+            SortDirection.ASC if is_desc else SortDirection.DESC
+        )
+        self._render_browser(select_name=self._selected_name)
+        self._update_sort_indicator()
+        direction_label = "↓" if self.config.sort_direction is SortDirection.DESC else "↑"
+        self._set_status(f"Sort direction: {self.config.sort_direction.value} {direction_label}")
 
     def action_cycle_size(self) -> None:
         order = [SizeMode.IEC, SizeMode.DECIMAL, SizeMode.RAW]
@@ -235,6 +286,7 @@ class ZFSDUApp(App[None]):
             )
 
         self._update_path()
+        self._update_sort_indicator()
 
         if self._visible_names:
             if select_name is not None and select_name in self._visible_names:
@@ -261,6 +313,7 @@ class ZFSDUApp(App[None]):
             include_bookmarks=self.config.include_bookmarks,
             allowed_types=self.config.dataset_types,
             sort_metric=self.config.sort_metric,
+            sort_direction=self.config.sort_direction,
         )
 
     def _is_visible(self, name: str) -> bool:
@@ -301,9 +354,11 @@ class ZFSDUApp(App[None]):
         current_label = self._current_directory or "top level"
         count = len(self._visible_names)
         noun = "entry" if count == 1 else "entries"
+        direction_symbol = "↓" if self.config.sort_direction is SortDirection.DESC else "↑"
+        sort_info = f"[dim]sort:[/] {self.config.sort_metric.value} {direction_symbol}"
         self.query_one("#path", Static).update(
             f"[b]Browsing:[/] {current_label}  [dim]root:[/] {root_label}\n"
-            f"[dim]items:[/] {count} {noun}"
+            f"[dim]items:[/] {count} {noun}  {sort_info}"
         )
 
     @on(DatasetTable.EnterDataset)

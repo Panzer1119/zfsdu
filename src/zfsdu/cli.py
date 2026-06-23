@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .errors import InvalidDatasetError, ZFSCommandError, ZFSUnavailableError
-from .models import DatasetType, SizeMode, SortMetric
+from .models import DatasetType, SizeMode, SortDirection, SortMetric
 from .ui.app import UIConfig, ZFSDUApp
 from .zfs import ZFSClient
 
@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[metric.value for metric in SortMetric],
         default=SortMetric.USED_BYTES.value,
         help="sort metric for tree nodes",
+    )
+    parser.add_argument(
+        "--sort-direction",
+        choices=[direction.value for direction in SortDirection],
+        default=SortDirection.DESC.value,
+        help="sort direction (asc=ascending, desc=descending)",
     )
 
     size_group = parser.add_mutually_exclusive_group()
@@ -148,6 +154,7 @@ def main() -> None:
         include_bookmarks=include_bookmarks,
         size_mode=select_size_mode(args),
         sort_metric=SortMetric(args.sort),
+        sort_direction=SortDirection(args.sort_direction),
     )
 
     try:

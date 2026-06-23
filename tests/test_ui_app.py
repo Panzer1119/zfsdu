@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Iterable
 
-from zfsdu.models import DatasetType, SizeMode, SortMetric, ZFSEntry
+from zfsdu.models import DatasetType, SizeMode, SortMetric, SortDirection, ZFSEntry
 from zfsdu.ui.app import UIConfig, ZFSDUApp
 from zfsdu.zfs import ZFSClient
 
@@ -40,6 +40,7 @@ def _make_app(*, root: str | None = None, include_snapshots: bool = False, inclu
             include_bookmarks=include_bookmarks,
             size_mode=SizeMode.RAW,
             sort_metric=SortMetric.USED_BYTES,
+            sort_direction=SortDirection.DESC,
         ),
     )
 

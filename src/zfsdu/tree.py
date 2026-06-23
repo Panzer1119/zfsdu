@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from .models import DatasetType, SortMetric, ZFSEntry
+from .models import DatasetType, SortMetric, SortDirection, ZFSEntry
 
 
 @dataclass(slots=True)
@@ -37,6 +37,7 @@ class DatasetIndex:
         include_bookmarks: bool,
         allowed_types: set[DatasetType],
         sort_metric: SortMetric,
+        sort_direction: SortDirection = SortDirection.DESC,
     ) -> list[str]:
         names = []
         for child_name in self.children.get(parent_name, []):
@@ -49,7 +50,8 @@ class DatasetIndex:
                 continue
             names.append(child_name)
 
-        return sorted(names, key=lambda name: self._sort_key(self.entries[name], sort_metric))
+        reverse = sort_direction is SortDirection.DESC
+        return sorted(names, key=lambda name: self._sort_key(self.entries[name], sort_metric), reverse=reverse)
 
     def has_children(self, name: str) -> bool:
         return name in self.children
@@ -80,11 +82,11 @@ class DatasetIndex:
         if metric is SortMetric.NAME:
             return (entry.short_name.lower(),)
         if metric is SortMetric.REFERENCED_BYTES:
-            return (-entry.refer, entry.short_name.lower())
+            return (entry.refer, entry.short_name.lower())
         if metric is SortMetric.SNAPSHOT_USED_BYTES:
-            return (-entry.used_by_snapshots, entry.short_name.lower())
+            return (entry.used_by_snapshots, entry.short_name.lower())
         if metric is SortMetric.SNAPSHOT_COUNT:
-            return (-entry.snapshot_count, entry.short_name.lower())
-        return (-entry.used, entry.short_name.lower())
+            return (entry.snapshot_count, entry.short_name.lower())
+        return (entry.used, entry.short_name.lower())
 
 
