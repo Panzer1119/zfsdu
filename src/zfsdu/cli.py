@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 
 from .errors import InvalidDatasetError, ZFSCommandError, ZFSUnavailableError
 from .models import DatasetType, SizeMode, SortMetric
@@ -61,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="WARNING",
         help="logging verbosity",
     )
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="optional log file path",
+    )
     return parser
 
 
@@ -97,11 +103,33 @@ def configure_color(mode: str) -> None:
         os.environ["FORCE_COLOR"] = "1"
 
 
+def configure_logging(level_name: str, log_file: str | None) -> None:
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_file:
+        path = Path(log_file).expanduser()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(logging.FileHandler(path, encoding="utf-8"))
+        except OSError as exc:
+            raise ValueError(f"Cannot write log file '{path}': {exc}") from exc
+
+    logging.basicConfig(
+        level=getattr(logging, level_name),
+        handlers=handlers,
+        force=True,
+    )
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    logging.basicConfig(level=getattr(logging, args.log_level))
+    try:
+        configure_logging(args.log_level, args.log_file)
+    except ValueError as exc:
+        parser.error(str(exc))
+        return
+
     configure_color(args.color)
 
     try:

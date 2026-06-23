@@ -40,6 +40,7 @@ uv run zfsdu tank
 uv run zfsdu tank/backups --types filesystem,volume --sort refer
 uv run zfsdu --types all --show-snapshots -p
 uv run zfsdu --color never
+uv run zfsdu --log-level INFO --log-file /tmp/zfsdu.log
 ```
 
 ### CLI options
@@ -52,6 +53,8 @@ uv run zfsdu --color never
 - `-p, --parsable` raw bytes
 - `--color auto|always|never`
 - `--show-snapshots` show snapshots initially
+- `--log-level DEBUG|INFO|WARNING|ERROR`
+- `--log-file PATH` optionally write logs to a file
 
 ### Keybindings
 
