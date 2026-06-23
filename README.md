@@ -13,13 +13,19 @@ It uses `zfs list` metadata directly (no filesystem walking), so it stays fast o
 - IEC, decimal, and raw-byte size display modes
 - Graceful command errors (missing `zfs`, invalid dataset root, permission failures)
 
-## Install
+## Install (uv)
 
 ```bash
-python -m pip install .
+uv sync
 ```
 
-For development:
+For development tools (`pytest`, `ruff`, `mypy`):
+
+```bash
+uv sync --extra dev
+```
+
+Optional pip fallback:
 
 ```bash
 python -m pip install -e '.[dev]'
@@ -28,11 +34,11 @@ python -m pip install -e '.[dev]'
 ## Usage
 
 ```bash
-zfsdu
-zfsdu tank
-zfsdu tank/backups --types filesystem,volume --sort refer
-zfsdu --types all --show-snapshots -p
-zfsdu --color never
+uv run zfsdu
+uv run zfsdu tank
+uv run zfsdu tank/backups --types filesystem,volume --sort refer
+uv run zfsdu --types all --show-snapshots -p
+uv run zfsdu --color never
 ```
 
 ### CLI options
@@ -67,7 +73,7 @@ zfsdu --color never
 ## Testing
 
 ```bash
-python -m pytest
+uv run pytest
 ```
 
 ## Notes on performance
