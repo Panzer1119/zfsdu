@@ -111,7 +111,7 @@ class ZFSDUApp(App[None]):
         table = self.query_one("#entries", DatasetTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("Name", "Used", "Refer", "Snapshots", "Share", "Type")
+        table.add_columns("Name", "Used", "Refer", "Snapshots Used", "Snapshots", "Share", "Type")
         self._load_data()
         table.focus()
 
@@ -126,11 +126,11 @@ class ZFSDUApp(App[None]):
             SortMetric.USED_BYTES: 1,
             SortMetric.REFERENCED_BYTES: 2,
             SortMetric.SNAPSHOT_USED_BYTES: 3,
-            SortMetric.SNAPSHOT_COUNT: 3,  # Also snapshots column
+            SortMetric.SNAPSHOT_COUNT: 4,
         }
 
         # Update column labels
-        columns = ["Name", "Used", "Refer", "Snapshots", "Share", "Type"]
+        columns = ["Name", "Used", "Refer", "Snapshots Used", "Snapshots", "Share", "Type"]
 
         if self.config.sort_metric in metric_to_column:
             col_idx = metric_to_column[self.config.sort_metric]
@@ -280,6 +280,7 @@ class ZFSDUApp(App[None]):
                 format_bytes(entry.used, self.config.size_mode),
                 format_bytes(entry.refer, self.config.size_mode),
                 format_bytes(entry.used_by_snapshots, self.config.size_mode),
+                entry.snapshot_count,
                 self._share_of_parent(entry),
                 entry.dataset_type.value,
                 key=name,
