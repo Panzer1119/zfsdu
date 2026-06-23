@@ -23,7 +23,7 @@ def _entry(name: str, dtype: DatasetType, used: int, refer: int = 0) -> ZFSEntry
     return ZFSEntry(name=name, dataset_type=dtype, used=used, refer=refer)
 
 
-def _make_app(*, root: str | None = None, include_snapshots: bool = False) -> ZFSDUApp:
+def _make_app(*, root: str | None = None, include_snapshots: bool = False, include_bookmarks: bool = False) -> ZFSDUApp:
     entries = [
         _entry("tank", DatasetType.FILESYSTEM, 100, 90),
         _entry("backup", DatasetType.FILESYSTEM, 40, 35),
@@ -37,6 +37,7 @@ def _make_app(*, root: str | None = None, include_snapshots: bool = False) -> ZF
             root=root,
             dataset_types={DatasetType.FILESYSTEM, DatasetType.SNAPSHOT},
             include_snapshots=include_snapshots,
+            include_bookmarks=include_bookmarks,
             size_mode=SizeMode.RAW,
             sort_metric=SortMetric.USED,
         ),

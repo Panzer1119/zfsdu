@@ -51,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="include snapshots in the tree by default",
     )
     parser.add_argument(
+        "--show-bookmarks",
+        action="store_true",
+        help="include bookmarks in the tree by default",
+    )
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="WARNING",
@@ -106,11 +111,13 @@ def main() -> None:
         return
 
     include_snapshots = args.show_snapshots or DatasetType.SNAPSHOT in dataset_types
+    include_bookmarks = args.show_bookmarks or DatasetType.BOOKMARK in dataset_types
 
     config = UIConfig(
         root=args.root,
         dataset_types=dataset_types,
         include_snapshots=include_snapshots,
+        include_bookmarks=include_bookmarks,
         size_mode=select_size_mode(args),
         sort_metric=SortMetric(args.sort),
     )

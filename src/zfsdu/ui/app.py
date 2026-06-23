@@ -21,6 +21,7 @@ class UIConfig:
     root: str | None
     dataset_types: set[DatasetType]
     include_snapshots: bool
+    include_bookmarks: bool
     size_mode: SizeMode
     sort_metric: SortMetric
 
@@ -67,6 +68,7 @@ class ZFSDUApp(App[None]):
         Binding("s", "cycle_sort", "Sort"),
         Binding("m", "cycle_size", "Size"),
         Binding("t", "toggle_snapshots", "Snapshots"),
+        Binding("b", "toggle_bookmarks", "Bookmarks"),
         Binding("/", "search", "Search"),
     ]
 
@@ -117,7 +119,12 @@ class ZFSDUApp(App[None]):
 
         entry = self.index.entries[self._selected_name]
         if entry.is_snapshot:
+            #TODO What if bookmarks are visible?
             self._set_status("Snapshots cannot be opened")
+            return
+
+        if entry.is_bookmark:
+            self._set_status("Bookmarks cannot be opened")
             return
 
         if self.index and not self.index.has_children(entry.name):
@@ -169,6 +176,12 @@ class ZFSDUApp(App[None]):
         self._render_browser(select_name=self._selected_name)
         state = "shown" if self.config.include_snapshots else "hidden"
         self._set_status(f"Snapshots {state}")
+
+    def action_toggle_bookmarks(self) -> None:
+        self.config.include_bookmarks = not self.config.include_bookmarks
+        self._render_browser(select_name=self._selected_name)
+        state = "shown" if self.config.include_bookmarks else "hidden"
+        self._set_status(f"Bookmarks {state}")
 
     def action_search(self) -> None:
         input_widget = self.query_one("#search-box", Input)
@@ -245,6 +258,7 @@ class ZFSDUApp(App[None]):
         return self.index.children_of(
             parent_name,
             include_snapshots=self.config.include_snapshots,
+            include_bookmarks=self.config.include_bookmarks,
             allowed_types=self.config.dataset_types,
             sort_metric=self.config.sort_metric,
         )
@@ -257,11 +271,15 @@ class ZFSDUApp(App[None]):
             return False
         if entry.is_snapshot and not self.config.include_snapshots:
             return False
+        if entry.is_bookmark and not self.config.include_bookmarks:
+            return False
         return True
 
     def _row_name(self, entry: ZFSEntry) -> str:
         if entry.is_snapshot:
-            return f"@ {entry.short_name}"
+            return f"  {entry.short_name}"
+        if entry.is_bookmark:
+            return f"  {entry.short_name}"
         if self.index and not self.index.has_children(entry.name):
             #TODO What if it has children, but snapshots are hidden?
             return f"  {entry.short_name}"

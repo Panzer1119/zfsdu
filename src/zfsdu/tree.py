@@ -34,13 +34,16 @@ class DatasetIndex:
         parent_name: str,
         *,
         include_snapshots: bool,
+        include_bookmarks: bool,
         allowed_types: set[DatasetType],
         sort_metric: SortMetric,
     ) -> list[str]:
         names = []
         for child_name in self.children.get(parent_name, []):
             entry = self.entries[child_name]
-            if not include_snapshots and entry.dataset_type is DatasetType.SNAPSHOT:
+            if not include_snapshots and entry.is_snapshot:
+                continue
+            if not include_bookmarks and entry.is_bookmark:
                 continue
             if entry.dataset_type not in allowed_types:
                 continue
