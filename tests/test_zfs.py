@@ -20,3 +20,13 @@ def test_parse_row_handles_dash_values() -> None:
     assert entry.used == 0
     assert entry.refer == 0
 
+
+def test_parse_get_all_row() -> None:
+    line = "tank/home\trecordsize\t131072\tlocal"
+    property_name, value, source = ZFSClient._parse_get_all_row(line)
+
+    assert property_name == "recordsize"
+    assert value == "131072"
+    assert source == "local"
+
+

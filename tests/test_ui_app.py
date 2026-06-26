@@ -18,6 +18,13 @@ class FakeZFSClient(ZFSClient):
     ) -> list[ZFSEntry]:
         return self.entries
 
+    def get_all_properties(self, dataset_name: str) -> list[tuple[str, str, str]]:
+        return [
+            ("recordsize", "131072", "local"),
+            ("aclmode", "discard", "default"),
+            ("compression", "zstd", "inherited"),
+        ]
+
 
 def _entry(name: str, dtype: DatasetType, used: int, refer: int = 0) -> ZFSEntry:
     return ZFSEntry(name=name, dataset_type=dtype, used=used, refer=refer)
@@ -105,6 +112,40 @@ def test_search_opens_matching_parent_directory() -> None:
 
             assert app._current_directory == "tank/home"
             assert app._selected_name == "tank/home/docs"
+
+    asyncio.run(scenario())
+
+
+def test_details_include_get_all_properties() -> None:
+    async def scenario() -> None:
+        app = _make_app()
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._selected_name == "tank"
+            assert "tank" in app._zfs_get_all_cache
+
+            rows = app._get_all_rows("tank")
+            rendered_rows = "\n".join(rows)
+            assert "aclmode" in rendered_rows
+            assert "compression" in rendered_rows
+            assert "recordsize" in rendered_rows
+            assert rendered_rows.index("aclmode") < rendered_rows.index("compression") < rendered_rows.index("recordsize")
+
+            data_rows = rows[2:]
+            source_starts = [
+                (line.index("default") if "default" in line else line.index("inherited") if "inherited" in line else line.index("local"))
+                for line in data_rows
+            ]
+            assert len(set(source_starts)) == 1
+
+            await pilot.press("d")
+            await pilot.pause()
+
+            filtered_rows = "\n".join(app._get_all_rows("tank"))
+            assert "aclmode" not in filtered_rows
+            assert "compression" in filtered_rows
+            assert "recordsize" in filtered_rows
 
     asyncio.run(scenario())
 

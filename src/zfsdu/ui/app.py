@@ -136,6 +136,7 @@ class ZFSDUApp(App[None]):
         Binding("m", "cycle_size", "Size"),
         Binding("t", "toggle_snapshots", "Snapshots"),
         Binding("b", "toggle_bookmarks", "Bookmarks"),
+        Binding("d", "toggle_default_properties", "Defaults"),
         Binding("/", "search", "Search"),
     ]
 
@@ -150,6 +151,9 @@ class ZFSDUApp(App[None]):
         self._search_results: list[str] = []
         self._search_cursor = 0
         self._last_search_query = ""
+        self._show_default_properties = False
+        self._zfs_get_all_cache: dict[str, list[tuple[str, str, str]]] = {}
+        self._zfs_get_all_error_cache: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -161,7 +165,7 @@ class ZFSDUApp(App[None]):
         yield Input(placeholder="Search datasets...", id="search-box", classes="hidden")
         yield Static(
             "Use ←/→ to leave or enter datasets, / to search, s to sort, "
-            "m to change size mode, t to toggle snapshots",
+            "m to change size mode, t to toggle snapshots, d to toggle default properties",
             id="status",
         )
         yield Footer()
@@ -288,6 +292,12 @@ class ZFSDUApp(App[None]):
         state = "shown" if self.config.include_bookmarks else "hidden"
         self._set_status(f"Bookmarks {state}")
 
+    def action_toggle_default_properties(self) -> None:
+        self._show_default_properties = not self._show_default_properties
+        self._refresh_details()
+        state = "shown" if self._show_default_properties else "hidden"
+        self._set_status(f"Default properties {state}")
+
     def action_search(self) -> None:
         input_widget = self.query_one("#search-box", Input)
         input_widget.remove_class("hidden")
@@ -303,6 +313,8 @@ class ZFSDUApp(App[None]):
             self._set_status(f"Error: {exc}")
             return
         self.index = DatasetIndex.build(entries)
+        self._zfs_get_all_cache.clear()
+        self._zfs_get_all_error_cache.clear()
         self._search_results.clear()
         self._search_cursor = 0
         self._last_search_query = ""
@@ -549,7 +561,47 @@ class ZFSDUApp(App[None]):
         if parent:
             rows.append(f"share of parent:   {format_percent(entry.used, parent_used)}")
 
+        rows.extend(["", "[b]zfs get all[/b]"])
+        rows.extend(self._get_all_rows(entry.name))
+
         details.update("\n".join(rows))
+
+    def _get_all_rows(self, dataset_name: str) -> list[str]:
+        if dataset_name in self._zfs_get_all_error_cache:
+            return [f"[dim]Unable to load properties:[/] {self._zfs_get_all_error_cache[dataset_name]}"]
+
+        properties = self._zfs_get_all_cache.get(dataset_name)
+        if properties is None:
+            try:
+                properties = self.zfs_client.get_all_properties(dataset_name)
+            except ZFSDUError as exc:
+                self._zfs_get_all_error_cache[dataset_name] = str(exc)
+                return [f"[dim]Unable to load properties:[/] {exc}"]
+            self._zfs_get_all_cache[dataset_name] = properties
+
+        visible_properties = sorted(properties, key=lambda row: row[0].lower())
+        if not self._show_default_properties:
+            visible_properties = [row for row in visible_properties if row[2].lower() != "default"]
+
+        if not visible_properties:
+            return ["[dim]No properties to display with current filters[/]"]
+
+        property_width = max((len(name) for name, _, _ in visible_properties), default=8)
+        property_width = min(max(property_width, 8), 36)
+        value_width = max((len(value) for _, value, _ in visible_properties), default=5)
+        value_width = min(max(value_width, 5), 64)
+        source_width = max((len(source) for _, _, source in visible_properties), default=6)
+        source_width = min(max(source_width, 6), 20)
+
+        rows = [
+            f"{'property':<{property_width}}  {'value':<{value_width}}  {'source':<{source_width}}",
+            f"{'-' * property_width}  {'-' * value_width}  {'-' * source_width}",
+        ]
+        rows.extend(
+            f"{property_name:<{property_width}}  {value:<{value_width}}  {source:<{source_width}}"
+            for property_name, value, source in visible_properties
+        )
+        return rows
 
     def _set_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)

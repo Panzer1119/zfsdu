@@ -60,6 +60,16 @@ class ZFSClient:
 
         return entries
 
+    def get_all_properties(self, dataset_name: str) -> list[tuple[str, str, str]]:
+        """Return parsed `zfs get all` output as (property, value, source) rows."""
+        cmd = [self.executable, "get", "-H", "-p", "all", dataset_name]
+        output = self._run(cmd)
+        return [
+            self._parse_get_all_row(line)
+            for line in output.splitlines()
+            if line.strip()
+        ]
+
     def _run(self, cmd: list[str]) -> str:
         self.check_available()
         _LOG.debug("Running command: %s", " ".join(cmd))
@@ -106,6 +116,14 @@ class ZFSClient:
             creation=_parse_zfs_int(creation),
             mountpoint=mount,
         )
+
+    @staticmethod
+    def _parse_get_all_row(line: str) -> tuple[str, str, str]:
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) != 4:
+            raise ZFSCommandError(f"Unexpected zfs get output row format: {line}")
+        _, property_name, value, source = parts
+        return property_name, value, source
 
 
 def _parse_zfs_int(value: str) -> int:
