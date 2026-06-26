@@ -29,6 +29,7 @@ class UIConfig:
     dataset_types: set[DatasetType]
     include_snapshots: bool
     include_bookmarks: bool
+    hide_legacy_mountpoints: bool
     size_mode: SizeMode
     sort_metric: SortMetric
     sort_direction: SortDirection
@@ -402,7 +403,7 @@ class ZFSDUApp(App[None]):
             return [
                 name for name in self.index.top_level(self.config.root) if self._is_visible(name)
             ]
-        return self.index.children_of(
+        names = self.index.children_of(
             parent_name,
             include_snapshots=self.config.include_snapshots,
             include_bookmarks=self.config.include_bookmarks,
@@ -410,6 +411,7 @@ class ZFSDUApp(App[None]):
             sort_metric=self.config.sort_metric,
             sort_direction=self.config.sort_direction,
         )
+        return [name for name in names if self._is_visible(name)]
 
     def _is_visible(self, name: str) -> bool:
         if not self.index:
@@ -420,6 +422,8 @@ class ZFSDUApp(App[None]):
         if entry.is_snapshot and not self.config.include_snapshots:
             return False
         if entry.is_bookmark and not self.config.include_bookmarks:
+            return False
+        if self.config.hide_legacy_mountpoints and entry.mountpoint == "legacy":
             return False
         return True
 

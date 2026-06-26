@@ -26,11 +26,23 @@ class FakeZFSClient(ZFSClient):
         ]
 
 
-def _entry(name: str, dtype: DatasetType, used: int, refer: int = 0) -> ZFSEntry:
-    return ZFSEntry(name=name, dataset_type=dtype, used=used, refer=refer)
+def _entry(
+    name: str,
+    dtype: DatasetType,
+    used: int,
+    refer: int = 0,
+    mountpoint: str = "-",
+) -> ZFSEntry:
+    return ZFSEntry(name=name, dataset_type=dtype, used=used, refer=refer, mountpoint=mountpoint)
 
 
-def _make_app(*, root: str | None = None, include_snapshots: bool = False, include_bookmarks: bool = False) -> ZFSDUApp:
+def _make_app(
+    *,
+    root: str | None = None,
+    include_snapshots: bool = False,
+    include_bookmarks: bool = False,
+    hide_legacy_mountpoints: bool = False,
+) -> ZFSDUApp:
     entries = [
         _entry("tank", DatasetType.FILESYSTEM, 100, 90),
         _entry("backup", DatasetType.FILESYSTEM, 40, 35),
@@ -45,6 +57,7 @@ def _make_app(*, root: str | None = None, include_snapshots: bool = False, inclu
             dataset_types={DatasetType.FILESYSTEM, DatasetType.SNAPSHOT},
             include_snapshots=include_snapshots,
             include_bookmarks=include_bookmarks,
+            hide_legacy_mountpoints=hide_legacy_mountpoints,
             size_mode=SizeMode.RAW,
             sort_metric=SortMetric.USED_BYTES,
             sort_direction=SortDirection.DESC,
@@ -146,6 +159,35 @@ def test_details_include_get_all_properties() -> None:
             assert "aclmode" not in filtered_rows
             assert "compression" in filtered_rows
             assert "recordsize" in filtered_rows
+
+    asyncio.run(scenario())
+
+
+def test_hide_legacy_mountpoints_filters_matching_datasets() -> None:
+    async def scenario() -> None:
+        entries = [
+            _entry("tank", DatasetType.FILESYSTEM, 100, 90, mountpoint="/tank"),
+            _entry("tank/legacy", DatasetType.FILESYSTEM, 40, 30, mountpoint="legacy"),
+            _entry("tank/normal", DatasetType.FILESYSTEM, 30, 20, mountpoint="/tank/normal"),
+        ]
+        app = ZFSDUApp(
+            zfs_client=FakeZFSClient(entries),
+            config=UIConfig(
+                root="tank",
+                dataset_types={DatasetType.FILESYSTEM},
+                include_snapshots=False,
+                include_bookmarks=False,
+                hide_legacy_mountpoints=True,
+                size_mode=SizeMode.RAW,
+                sort_metric=SortMetric.NAME,
+                sort_direction=SortDirection.ASC,
+            ),
+        )
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert "tank/legacy" not in app._visible_names
+            assert "tank/normal" in app._visible_names
 
     asyncio.run(scenario())
 

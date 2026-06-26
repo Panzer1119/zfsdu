@@ -13,6 +13,13 @@ def test_parser_accepts_log_file() -> None:
     assert args.log_file == "zfsdu.log"
 
 
+def test_parser_accepts_hide_legacy_mountpoints_flag() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["--hide-legacy-mountpoints"])
+
+    assert args.hide_legacy_mountpoints is True
+
+
 def test_configure_logging_writes_to_file(tmp_path: Path) -> None:
     log_file = tmp_path / "zfsdu.log"
 

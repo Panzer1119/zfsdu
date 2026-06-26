@@ -63,6 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="include bookmarks in the tree by default",
     )
     parser.add_argument(
+        "--hide-legacy-mountpoints",
+        action="store_true",
+        help="hide datasets where mountpoint=legacy",
+    )
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="WARNING",
@@ -152,6 +157,7 @@ def main() -> None:
         dataset_types=dataset_types,
         include_snapshots=include_snapshots,
         include_bookmarks=include_bookmarks,
+        hide_legacy_mountpoints=args.hide_legacy_mountpoints,
         size_mode=select_size_mode(args),
         sort_metric=SortMetric(args.sort),
         sort_direction=SortDirection(args.sort_direction),

@@ -41,6 +41,7 @@ uv run zfsdu tank/backups --types filesystem,volume --sort refer
 uv run zfsdu --types all --show-snapshots -p
 uv run zfsdu --color never
 uv run zfsdu --log-level INFO --log-file /tmp/zfsdu.log
+uv run zfsdu --hide-legacy-mountpoints
 ```
 
 ### CLI options
@@ -54,6 +55,7 @@ uv run zfsdu --log-level INFO --log-file /tmp/zfsdu.log
 - `-p, --parsable` raw bytes
 - `--color auto|always|never`
 - `--show-snapshots` show snapshots initially
+- `--hide-legacy-mountpoints` hide datasets where `mountpoint=legacy`
 - `--log-level DEBUG|INFO|WARNING|ERROR`
 - `--log-file PATH` optionally write logs to a file
 
