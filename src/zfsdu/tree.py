@@ -41,13 +41,12 @@ class DatasetIndex:
         parents: dict[str, str | None] = {}
 
         for entry in filesystems:
-            parent: str | None = None
-            if root and entry.name == root:
-                parent = None
-            else:
-                origin_parent = entry.origin_dataset_name
-                if origin_parent and origin_parent in by_name:
-                    parent = origin_parent
+            if entry.name == root:
+                continue
+            parent: str | None = root
+            origin_parent = entry.origin_dataset_name
+            if origin_parent and origin_parent in by_name:
+                parent = origin_parent
 
             children[parent].append(entry.name)
             parents[entry.name] = parent
