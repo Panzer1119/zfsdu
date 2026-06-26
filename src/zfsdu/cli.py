@@ -68,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="hide datasets where mountpoint=legacy",
     )
     parser.add_argument(
+        "--docker-origin-tree",
+        action="store_true",
+        help="build the tree from clone origin relations (filesystem-only Docker ZFS view)",
+    )
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="WARNING",
@@ -152,12 +157,21 @@ def main() -> None:
     include_snapshots = args.show_snapshots or DatasetType.SNAPSHOT in dataset_types
     include_bookmarks = args.show_bookmarks or DatasetType.BOOKMARK in dataset_types
 
+    if args.docker_origin_tree:
+        if not args.root:
+            parser.error("--docker-origin-tree requires a dataset root")
+            return
+        dataset_types = {DatasetType.FILESYSTEM}
+        include_snapshots = False
+        include_bookmarks = False
+
     config = UIConfig(
         root=args.root,
         dataset_types=dataset_types,
         include_snapshots=include_snapshots,
         include_bookmarks=include_bookmarks,
         hide_legacy_mountpoints=args.hide_legacy_mountpoints,
+        docker_origin_tree=args.docker_origin_tree,
         size_mode=select_size_mode(args),
         sort_metric=SortMetric(args.sort),
         sort_direction=SortDirection(args.sort_direction),

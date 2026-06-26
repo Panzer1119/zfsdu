@@ -20,6 +20,14 @@ def test_parser_accepts_hide_legacy_mountpoints_flag() -> None:
     assert args.hide_legacy_mountpoints is True
 
 
+def test_parser_accepts_docker_origin_tree_flag() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["--docker-origin-tree", "tank/docker"])
+
+    assert args.docker_origin_tree is True
+    assert args.root == "tank/docker"
+
+
 def test_configure_logging_writes_to_file(tmp_path: Path) -> None:
     log_file = tmp_path / "zfsdu.log"
 

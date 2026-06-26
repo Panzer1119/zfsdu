@@ -21,6 +21,7 @@ _ZFS_COLUMNS = [
     "usedbyrefreservation",
     "creation",
     "mountpoint",
+    "origin",
 ]
 
 
@@ -102,6 +103,7 @@ class ZFSClient:
             by_refres,
             creation,
             mount,
+            origin,
         ) = parts
 
         return ZFSEntry(
@@ -115,6 +117,7 @@ class ZFSClient:
             used_by_refreservation=_parse_zfs_int(by_refres),
             creation=_parse_zfs_int(creation),
             mountpoint=mount,
+            origin=origin,
         )
 
     @staticmethod

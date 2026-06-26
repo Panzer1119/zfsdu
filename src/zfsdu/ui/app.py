@@ -30,6 +30,7 @@ class UIConfig:
     include_snapshots: bool
     include_bookmarks: bool
     hide_legacy_mountpoints: bool
+    docker_origin_tree: bool
     size_mode: SizeMode
     sort_metric: SortMetric
     sort_direction: SortDirection
@@ -237,7 +238,7 @@ class ZFSDUApp(App[None]):
             return
 
         previous = self._current_directory
-        self._current_directory = self.index.entries[previous].parent_name
+        self._current_directory = self.index.parent_of(previous)
         self._render_browser(select_name=previous)
         location = self._current_directory or "top level"
         self._set_status(f"Browsing {location}")
@@ -309,11 +310,18 @@ class ZFSDUApp(App[None]):
         previous_directory = self._current_directory
         previous_selection = self._selected_name
         try:
-            entries = self.zfs_client.list_entries(self.config.dataset_types, self.config.root)
+            query_types = self.config.dataset_types
+            if self.config.docker_origin_tree:
+                # Origins point at snapshots, so include snapshots for lineage parsing.
+                query_types = {DatasetType.FILESYSTEM, DatasetType.SNAPSHOT}
+            entries = self.zfs_client.list_entries(query_types, self.config.root)
         except ZFSDUError as exc:
             self._set_status(f"Error: {exc}")
             return
-        self.index = DatasetIndex.build(entries)
+        if self.config.docker_origin_tree:
+            self.index = DatasetIndex.build_by_origin(entries, self.config.root)
+        else:
+            self.index = DatasetIndex.build(entries)
         self._zfs_get_all_cache.clear()
         self._zfs_get_all_error_cache.clear()
         self._search_results.clear()
@@ -440,7 +448,7 @@ class ZFSDUApp(App[None]):
     def _share_of_parent(self, entry: ZFSEntry) -> str:
         if not self.index:
             return "-"
-        parent_name = entry.parent_name
+        parent_name = self.index.parent_of(entry.name)
         if not parent_name:
             return "-"
         parent = self.index.entries.get(parent_name)
@@ -519,7 +527,7 @@ class ZFSDUApp(App[None]):
             return (self.config.root, None)
         if self.config.root and name == self.config.root:
             return (self.config.root, None)
-        return (self.index.entries[name].parent_name, name)
+        return (self.index.parent_of(name), name)
 
     def _refresh_details(self, name: str | None = None) -> None:
         details = self.query_one("#details", Static)
@@ -533,7 +541,8 @@ class ZFSDUApp(App[None]):
             return
 
         entry = self.index.entries[target_name]
-        parent = self.index.entries.get(entry.parent_name or "")
+        parent_name = self.index.parent_of(entry.name)
+        parent = self.index.entries.get(parent_name or "")
         parent_used = parent.used if parent else 0
         snapshot_count = self._snapshot_count(entry.name)
         bookmark_count = self._bookmark_count(entry.name)

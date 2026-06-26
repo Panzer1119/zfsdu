@@ -58,6 +58,7 @@ def _make_app(
             include_snapshots=include_snapshots,
             include_bookmarks=include_bookmarks,
             hide_legacy_mountpoints=hide_legacy_mountpoints,
+            docker_origin_tree=False,
             size_mode=SizeMode.RAW,
             sort_metric=SortMetric.USED_BYTES,
             sort_direction=SortDirection.DESC,
@@ -140,10 +141,10 @@ def test_details_include_get_all_properties() -> None:
 
             rows = app._get_all_rows("tank")
             rendered_rows = "\n".join(rows)
-            assert "aclmode" in rendered_rows
+            assert "aclmode" not in rendered_rows
             assert "compression" in rendered_rows
             assert "recordsize" in rendered_rows
-            assert rendered_rows.index("aclmode") < rendered_rows.index("compression") < rendered_rows.index("recordsize")
+            assert rendered_rows.index("compression") < rendered_rows.index("recordsize")
 
             data_rows = rows[2:]
             source_starts = [
@@ -156,7 +157,7 @@ def test_details_include_get_all_properties() -> None:
             await pilot.pause()
 
             filtered_rows = "\n".join(app._get_all_rows("tank"))
-            assert "aclmode" not in filtered_rows
+            assert "aclmode" in filtered_rows
             assert "compression" in filtered_rows
             assert "recordsize" in filtered_rows
 
@@ -178,6 +179,7 @@ def test_hide_legacy_mountpoints_filters_matching_datasets() -> None:
                 include_snapshots=False,
                 include_bookmarks=False,
                 hide_legacy_mountpoints=True,
+                docker_origin_tree=False,
                 size_mode=SizeMode.RAW,
                 sort_metric=SortMetric.NAME,
                 sort_direction=SortDirection.ASC,
@@ -188,6 +190,58 @@ def test_hide_legacy_mountpoints_filters_matching_datasets() -> None:
             await pilot.pause()
             assert "tank/legacy" not in app._visible_names
             assert "tank/normal" in app._visible_names
+
+    asyncio.run(scenario())
+
+
+def test_origin_tree_mode_uses_origin_parent_relationships() -> None:
+    async def scenario() -> None:
+        entries = [
+            _entry("tank/docker", DatasetType.FILESYSTEM, 100, 90),
+            ZFSEntry(
+                name="tank/docker/layer-a",
+                dataset_type=DatasetType.FILESYSTEM,
+                used=40,
+                refer=35,
+                origin="tank/docker@snap-root",
+            ),
+            ZFSEntry(
+                name="tank/docker/layer-b",
+                dataset_type=DatasetType.FILESYSTEM,
+                used=20,
+                refer=18,
+                origin="tank/docker/layer-a@snap-a",
+            ),
+            _entry("tank/docker@unused", DatasetType.SNAPSHOT, 1, 1),
+        ]
+        app = ZFSDUApp(
+            zfs_client=FakeZFSClient(entries),
+            config=UIConfig(
+                root="tank/docker",
+                dataset_types={DatasetType.FILESYSTEM},
+                include_snapshots=False,
+                include_bookmarks=False,
+                hide_legacy_mountpoints=False,
+                docker_origin_tree=True,
+                size_mode=SizeMode.RAW,
+                sort_metric=SortMetric.NAME,
+                sort_direction=SortDirection.ASC,
+            ),
+        )
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._current_directory == "tank/docker"
+            assert app._visible_names == ["tank/docker/layer-a"]
+
+            await pilot.press("right")
+            await pilot.pause()
+            assert app._current_directory == "tank/docker/layer-a"
+            assert app._visible_names == ["tank/docker/layer-b"]
+
+            await pilot.press("left")
+            await pilot.pause()
+            assert app._current_directory == "tank/docker"
 
     asyncio.run(scenario())
 

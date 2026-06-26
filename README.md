@@ -42,6 +42,7 @@ uv run zfsdu --types all --show-snapshots -p
 uv run zfsdu --color never
 uv run zfsdu --log-level INFO --log-file /tmp/zfsdu.log
 uv run zfsdu --hide-legacy-mountpoints
+uv run zfsdu tank/docker --docker-origin-tree
 ```
 
 ### CLI options
@@ -56,8 +57,25 @@ uv run zfsdu --hide-legacy-mountpoints
 - `--color auto|always|never`
 - `--show-snapshots` show snapshots initially
 - `--hide-legacy-mountpoints` hide datasets where `mountpoint=legacy`
+- `--docker-origin-tree` build filesystem tree from `origin` clone lineage under `root`
 - `--log-level DEBUG|INFO|WARNING|ERROR`
 - `--log-file PATH` optionally write logs to a file
+
+### Docker ZFS lineage mode
+
+When Docker uses the ZFS storage driver, clone layers are linked through the `origin` property
+(`dataset@snapshot`) instead of normal path hierarchy. Use:
+
+```bash
+uv run zfsdu <docker-root-dataset> --docker-origin-tree
+```
+
+In this mode, `zfsdu`:
+
+- treats the positional `root` dataset as required scan root
+- displays only filesystem datasets in the browser
+- builds parent/child relationships from clone `origin` links
+- keeps snapshots in the background only to resolve lineage metadata
 
 ### Keybindings
 

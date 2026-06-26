@@ -58,3 +58,38 @@ def test_search_respects_root() -> None:
     results = index.search("home", "tank")
     assert results == ["tank/home"]
 
+
+def test_build_by_origin_relations() -> None:
+    index = DatasetIndex.build_by_origin(
+        [
+            _entry("tank/docker", DatasetType.FILESYSTEM, 100),
+            ZFSEntry(
+                name="tank/docker/layer-a",
+                dataset_type=DatasetType.FILESYSTEM,
+                used=50,
+                refer=30,
+                origin="tank/docker@snap-root",
+            ),
+            ZFSEntry(
+                name="tank/docker/layer-b",
+                dataset_type=DatasetType.FILESYSTEM,
+                used=20,
+                refer=10,
+                origin="tank/docker/layer-a@snap-1",
+            ),
+            _entry("tank/docker@ignore", DatasetType.SNAPSHOT, 1),
+        ],
+        root="tank/docker",
+    )
+
+    assert index.top_level("tank/docker") == ["tank/docker"]
+    assert index.children_of(
+        "tank/docker",
+        include_snapshots=False,
+        include_bookmarks=False,
+        allowed_types={DatasetType.FILESYSTEM},
+        sort_metric=SortMetric.NAME,
+    ) == ["tank/docker/layer-a"]
+    assert index.parent_of("tank/docker/layer-b") == "tank/docker/layer-a"
+
+

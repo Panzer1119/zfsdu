@@ -73,6 +73,7 @@ class ZFSEntry:
     used_by_refreservation: int = 0
     creation: int = 0
     mountpoint: str = "-"
+    origin: str = "-"
     snapshot_count: int = 0 #TODO How do we calculate this, if this is read-only?
 
     @property
@@ -119,5 +120,13 @@ class ZFSEntry:
         if "/" not in self.name:
             return self.name
         return self.name.rsplit("/", 1)[1]
+
+    @property
+    def origin_dataset_name(self) -> str | None:
+        if self.origin in {"-", "", "none"}:
+            return None
+        if "@" not in self.origin:
+            return None
+        return self.origin.split("@", 1)[0]
 
 

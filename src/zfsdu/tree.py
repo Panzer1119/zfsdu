@@ -10,19 +10,49 @@ from .models import DatasetType, SortMetric, SortDirection, ZFSEntry
 class DatasetIndex:
     entries: dict[str, ZFSEntry]
     children: dict[str | None, list[str]]
+    parents: dict[str, str | None]
 
     @classmethod
     def build(cls, entries: list[ZFSEntry]) -> DatasetIndex:
         by_name = {entry.name: entry for entry in entries}
         children: dict[str | None, list[str]] = defaultdict(list)
+        parents: dict[str, str | None] = {}
 
         for entry in entries:
             parent = entry.parent_name
             if parent and parent not in by_name and not entry.is_snapshot and not entry.is_bookmark:
                 parent = None
             children[parent].append(entry.name)
+            parents[entry.name] = parent
 
-        return cls(entries=by_name, children=dict(children))
+        return cls(entries=by_name, children=dict(children), parents=parents)
+
+    @classmethod
+    def build_by_origin(cls, entries: list[ZFSEntry], root: str | None) -> DatasetIndex:
+        filesystems = [entry for entry in entries if entry.dataset_type is DatasetType.FILESYSTEM]
+        if root:
+            root_prefix = f"{root}/"
+            filesystems = [
+                entry for entry in filesystems if entry.name == root or entry.name.startswith(root_prefix)
+            ]
+
+        by_name = {entry.name: entry for entry in filesystems}
+        children: dict[str | None, list[str]] = defaultdict(list)
+        parents: dict[str, str | None] = {}
+
+        for entry in filesystems:
+            parent: str | None = None
+            if root and entry.name == root:
+                parent = None
+            else:
+                origin_parent = entry.origin_dataset_name
+                if origin_parent and origin_parent in by_name:
+                    parent = origin_parent
+
+            children[parent].append(entry.name)
+            parents[entry.name] = parent
+
+        return cls(entries=by_name, children=dict(children), parents=parents)
 
     def top_level(self, root: str | None) -> list[str]:
         if root:
@@ -68,6 +98,9 @@ class DatasetIndex:
 
     def has_children(self, name: str) -> bool:
         return name in self.children
+
+    def parent_of(self, name: str) -> str | None:
+        return self.parents.get(name)
 
     def search(self, query: str, root: str | None) -> list[str]:
         needle = query.lower().strip()
