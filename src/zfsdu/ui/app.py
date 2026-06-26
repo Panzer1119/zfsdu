@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -598,6 +599,21 @@ class ZFSDUApp(App[None]):
 
         if not visible_properties:
             return ["[dim]No properties to display with current filters[/]"]
+
+        for index, row in enumerate(visible_properties):
+            key, value, source = row
+            if key in {"available", "logicalreferenced", "logicalused", "referenced", "snapshots_changed", "used", "usedbychildren", "usedbydataset", "usedbyrefreservation", "usedbysnapshots", "written"} or key.startswith("usedby") or key.startswith("userused@") or key.startswith("groupused@") or key.startswith("projectused@") or key.startswith("written@"):
+                if value == "-" or value is None:
+                    value = "-"
+                else:
+                    value = format_bytes(int(value), self.config.size_mode)
+            elif key in {"defaultuserquota", "defaultgroupquota", "defaultprojectquota", "recordsize", "refquota", "refreservation", "reservation", "special_small_blocks", "quota", "volblocksize", "volsize"} or key.startswith("userquota@") or key.startswith("groupquota@") or key.startswith("projectquota@"):
+                value = value
+            elif key in {"creation"}:
+                value = datetime.fromtimestamp(int(value), timezone.utc).isoformat()
+            else:
+                continue
+            visible_properties[index] = (key, value, source)
 
         property_width = max((len(name) for name, _, _ in visible_properties), default=8)
         property_width = min(max(property_width, 8), 36)
